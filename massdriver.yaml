@@ -1,60 +1,133 @@
-# This file will be used to generate all of the schema-*.json files in a bundle
 schema: draft-07
-name: "aws-elasticache-memcached"
-description: "AWS Elasticache Memcached"
-source_url: github.com/YOUR_NAME_HERE/aws-elasticache-memcached
-access: "private"
-type: "bundle"
+name: aws-elasticache-memcached
+description: "Amazon ElastiCache for memcached is a blazing fast in-memory data store that provides sub-millisecond latency to power internet-scale real-time applications."
+source_url: github.com/massdriver-cloud/aws-elasticache-memcached
+access: "public"
+type: infrastructure
 
-# schema-params.json
-# JSON Schema sans-fields above
 params:
-  # Examples will show up as configuration presets in the UI _and_
-  # they will be used to test configurations of the bundle.
+  default: {}
   examples:
-    - __name: Development
-      foo: bar
-    - __name: Production
-      foo: foo
+    - __name: Free Tier
+      memcached_version: "6.x"
+      node_type: cache.t3.micro
+      replicas: 0
+      cluster_mode_enabled: false
+      secure: true
+      allow_vpc_access: true
+    - __name: Highly Available
+      memcached_version: "6.x"
+      node_type: cache.t3.micro
+      replicas: 1
+      cluster_mode_enabled: false
+      secure: true
+      allow_vpc_access: true
+    - __name: Sharded Cluster
+      memcached_version: "6.x"
+      node_type: cache.r5.large
+      replicas: 1
+      cluster_mode_enabled: true
+      node_groups: 2
+      secure: true
+      allow_vpc_access: true
   required:
-    - foo
+    - memcached_version
+    - node_type
+    - replicas
+    - cluster_mode_enabled
   properties:
-    foo:
+    memcached_version:
       type: string
-      title: Foo
-      description: Name of aws-elasticache-memcached
-      default: ""
-      examples:
-        - US-West 2 VPC
-        - US-East 1 VPC
-
-# schema-connections.json
-# Named list of input connections (artifacts) (map[name]artifact)
+      title: memcached Version
+      description: Major memcached version to use
+      default: "6.x"
+      enum:
+        - "3.2"
+        - "4.0"
+        - "5.0"
+        - "6.x"
+    node_type:
+      type: string
+      title: Node Type
+      description: AWS node type to use for the cluster
+      enum:
+        - cache.m5.large
+        - cache.m5.xlarge
+        - cache.m5.2xlarge
+        - cache.m5.4xlarge
+        - cache.m5.12xlarge
+        - cache.m5.24xlarge
+        - cache.r5.large
+        - cache.r5.xlarge
+        - cache.r5.2xlarge
+        - cache.r5.4xlarge
+        - cache.r5.12xlarge
+        - cache.r5.24xlarge
+        - cache.t3.micro
+        - cache.t3.small
+        - cache.t3.medium
+    replicas:
+      type: integer
+      title: Replicas
+      description: Number of read replicas per node group. Each node group will have a single primary instace, and 0 to 5 read replicas. If you would like automatic fail-over for high-availability, you need at least 1 replica.
+      default: 0
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+    cluster_mode_enabled:
+      type: boolean
+      title: Cluster Mode Enabled
+      description: "Cluster mode allows you to scale your cluster horizontally across multiple node groups. This is useful at massive scale (beyond limits of vertical scaling). NOTE: Changing this will recreate the cluster."
+      default: false
+    node_groups:
+      type: integer
+      title: Number of Node Groups
+      description: Number of node groups (shards) in the cluster. Each node group will have a primary node and the number of read replicas specified above.
+      default: 2
+      minimum: 2
+      maximum: 250
+    secure:
+      type: boolean
+      title: Secure cluster with an auth token and TLS encryption
+      description: "Secure cluster with an auth token and TLS encryption (Required for most security compliance audits eg. HIPAA). NOTE: Changing this will recreate the cluster."
+      default: true
+    subnet_type:
+      title: Subnet Type
+      description: Deploy memcached to internal subnets (cannot reach the internet) or private subnets (internet egress traffic allowed)
+      type: string
+      enum: [internal, private]
+      default: internal
 
 connections:
-  properties: {}
+  required:
+    - vpc
+    - aws_authentication
+  properties:
+    vpc:
+      $ref: massdriver/aws-vpc
+    aws_authentication:
+      $ref: massdriver/aws-iam-role
 
+# artifacts:
+#   required:
+#     - authentication
+#   properties:
+#     authentication:
+#       $ref: massdriver/memcached-authentication
 
-# schema-artifacts.json
-# Named list of output artifacts  (map[name]artifact)
-artifacts:
-  properties: {}
-  # required:
-  #   - network
-  # properties:
-  #   network:
-  #     $ref: massdriver/aws-vpc
-
-# schema-ui.json
-# List of form customizations for params-schema
 ui:
   ui:order:
+    - memcached_version
+    - node_type
+    - replicas
+    - cluster_mode_enabled
+    - node_groups
+    - secure
+    - subnet_type
     - "*"
-  ## set top level ui:wiget
-  # secret_key:
-  #    ui:widget: "password"
-  ## Set key in an array of objects
-  # secrets:
-  #   items:
-  #     mdKeyId:
-  #       ui:widget: "hidden"
+  node_groups:
+    condition: cluster_mode_enabled=true
